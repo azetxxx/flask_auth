@@ -37,7 +37,7 @@ with app.app_context():
 
 @app.route('/')
 def home():
-    return render_template("index.html")
+    return render_template("index.html", logged_in=current_user.is_authenticated)
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -53,13 +53,18 @@ def register():
             email=request.form.get("email"),
             password = salt_hash,
         )
+        # User exists
+        user_duplicated = User.query.filter_by(email=new_user.email)
+        if user_duplicated:
+            flash("You've already signed up with that email, log in instead!")
+            return redirect(url_for('login'))
         db.session.add(new_user)
         db.session.commit()
 
         # Login and auth user
         login_user(new_user)
         return redirect(url_for("secrets"))
-    return render_template("register.html")
+    return render_template("register.html", logged_in=current_user.is_authenticated)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -67,14 +72,17 @@ def login():
     if request.method == 'POST':
         login_email = request.form.get("email")
         login_password = request.form.get("password")
-
         user = User.query.filter_by(email=login_email).first()
-        pass_ok = check_password_hash(user.password, login_password)
-        if user and pass_ok:
+        if not user:
+            flash('That email address does not exist, please try again.')
+            return redirect(url_for('login'))
+        elif not check_password_hash(user.password, login_password):
+            flash('Passwort incorrect, please try again.')
+        else:
             login_user(user)
             return redirect(url_for('secrets'))
 
-    return render_template("login.html")
+    return render_template("login.html", logged_in=current_user.is_authenticated)
 
 
 
@@ -82,7 +90,7 @@ def login():
 @login_required
 def secrets():
     print(current_user.name)
-    return render_template("secrets.html", name=current_user.name)
+    return render_template("secrets.html", name=current_user.name, logged_in=current_user.is_authenticated)
 
 
 @app.route('/logout')
